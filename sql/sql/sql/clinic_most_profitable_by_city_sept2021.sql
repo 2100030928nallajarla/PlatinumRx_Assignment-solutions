@@ -1,37 +1,23 @@
-WITH clinic_rev AS (
-    SELECT c.cid,
-           c.city,
-           SUM(cs.amount) AS revenue
+WITH profits AS (
+    SELECT
+        c.city,
+        cs.cid,
+        DATE_FORMAT(cs.datetime, '%Y-%m') AS month,
+        SUM(cs.amount) -
+          COALESCE((SELECT SUM(e.amount)
+                    FROM expenses e
+                    WHERE e.cid = cs.cid
+                    AND DATE_FORMAT(e.datetime, '%Y-%m') = DATE_FORMAT(cs.datetime, '%Y-%m')
+                   ), 0) AS profit
     FROM clinic_sales cs
-    JOIN clinics c ON c.cid = cs.cid
-    WHERE YEAR(cs.datetime) = 2021
-      AND MONTH(cs.datetime) = 9
-    GROUP BY c.cid, c.city
+    JOIN clinics c ON cs.cid = c.cid
+    WHERE DATE_FORMAT(cs.datetime, '%Y-%m') = '2021-09'
+    GROUP BY city, cs.cid, month
 ),
-clinic_exp AS (
-    SELECT e.cid,
-           SUM(e.amount) AS expense
-    FROM expenses e
-    WHERE YEAR(e.datetime) = 2021
-      AND MONTH(e.datetime) = 9
-    GROUP BY e.cid
-),
-profit AS (
-    SELECT r.cid,
-           r.city,
-           COALESCE(r.revenue, 0) - COALESCE(e.expense, 0) AS profit
-    FROM clinic_rev r
-    LEFT JOIN clinic_exp e ON e.cid = r.cid
+ranked AS (
+  SELECT *,
+         RANK() OVER (PARTITION BY city ORDER BY profit DESC) AS rnk
+  FROM profits
 )
-SELECT city, cid, profit
-FROM (
-    SELECT city,
-           cid,
-           profit,
-           RANK() OVER (
-               PARTITION BY city
-               ORDER BY profit DESC
-           ) AS rnk
-    FROM profit
-) t
-WHERE rnk = 1;
+SELECT city, cid, month, profit
+FROM ranked WHERE rnk = 1;
