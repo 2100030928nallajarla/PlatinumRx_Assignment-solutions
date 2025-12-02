@@ -1,6 +1,8 @@
 SELECT 
-    sales_channel,
-    SUM(amount) AS revenue
+    uid,
+    SUM(amount) AS total_revenue
 FROM clinic_sales
 WHERE YEAR(datetime) = 2021
-GROUP BY sales_channel;
+GROUP BY uid
+ORDER BY total_revenue DESC
+LIMIT 10;
